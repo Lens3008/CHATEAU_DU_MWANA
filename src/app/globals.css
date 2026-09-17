@@ -1,26 +1,318 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Public Theme Variables */
+  --color-public-bg: #FDFBF7;
+  --color-public-surface: #FFFFFF;
+  --color-public-surface-alt: #FFF8F0;
+  --color-public-text: #0F172A;
+  --color-public-text-muted: #475569;
+  --color-public-primary: #FBBF24; /* Golden */
+  --color-public-primary-hover: #F59E0B;
+  --color-public-secondary: #0F172A;
+  --color-public-secondary-hover: #1E293B;
+  --color-public-accent-red: #D72638; /* Rouge du logo */
+  --color-public-accent-green: #3A7D44; /* Vert du logo */
+  
+  /* Admin Theme Variables - Château du Mwana Identity */
+  --color-admin-bg: #F8FAFC;
+  --color-admin-surface: #FFFFFF;
+  --color-admin-sidebar: #0F172A; /* Bleu profond nuit */
+  --color-admin-sidebar-hover: #1E293B;
+  --color-admin-sidebar-active: #334155;
+  --color-admin-text: #0F172A;
+  --color-admin-text-muted: #64748B;
+  --color-admin-border: #E2E8F0;
+  
+  /* Château du Mwana Brand Colors for Admin */
+  --color-chateau-gold: #FBBF24; /* Or premium - CTA primary */
+  --color-chateau-gold-hover: #F59E0B;
+  --color-chateau-gold-light: #FEF3C7;
+  --color-chateau-red: #D72638; /* Rouge critique - alertes, erreurs */
+  --color-chateau-red-light: #FEE2E2;
+  --color-chateau-green: #3A7D44; /* Vert succès - disponibilité */
+  --color-chateau-green-light: #DCFCE7;
+  --color-chateau-blue: #1E3A8A; /* Bleu profond - structure */
+  --color-chateau-blue-light: #DBEAFE;
+  
+  /* Status Colors - Unified with Château identity */
+  --color-status-success-bg: var(--color-chateau-green-light);
+  --color-status-success-text: #166534;
+  --color-status-pending-bg: #FEF9C3;
+  --color-status-pending-text: #854D0E;
+  --color-status-error-bg: var(--color-chateau-red-light);
+  --color-status-error-text: #991B1B;
+  --color-status-neutral-bg: #F1F5F9;
+  --color-status-neutral-text: #475569;
+  
+  /* Design System - Surfaces */
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F8FAFC;
+  --surface-tertiary: #F1F5F9;
+  --surface-elevated: #FFFFFF;
+  --surface-overlay: rgba(15, 23, 42, 0.5);
+  
+  /* Design System - Typography */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --text-inverse: #FFFFFF;
+  --text-accent: var(--color-chateau-gold);
+  
+  /* Design System - Borders */
+  --border-light: #E2E8F0;
+  --border-medium: #CBD5E1;
+  --border-dark: #94A3B8;
+  
+  /* Design System - Focus */
+  --focus-ring: var(--color-chateau-gold);
+  --focus-ring-offset: 2px;
+
+  /* Fonts */
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Quicksand", sans-serif; /* Friendly & Premium */
+  --font-serif: "Playfair Display", serif;
+  
+  /* Shadows */
+  --shadow-public-card: 0 20px 40px -15px rgba(15, 23, 42, 0.1);
+  --shadow-public-hover: 0 30px 60px -15px rgba(15, 23, 42, 0.15);
+  --shadow-admin-card: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+  
+  /* Border Radius */
+  --radius-public: 2rem;
+  --radius-admin: 0.5rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #FFFFFF;
+    --foreground: #0F172A;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    /* Keep the original strict requirements or just adapt */
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Ensure respects reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom utilities for waves */
+@layer utilities {
+  .wave-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+    transform: rotate(180deg);
+  }
+  .wave-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+  }
+  .wave-svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 60px;
+  }
+  
+  @media (min-width: 768px) {
+    .wave-svg {
+      height: 120px;
+    }
+  }
+
+  /* Masonry Grid Utilities */
+  .masonry-grid {
+    column-count: 1;
+    column-gap: 1.5rem;
+  }
+  @media (min-width: 640px) {
+    .masonry-grid {
+      column-count: 2;
+    }
+  }
+  @media (min-width: 1024px) {
+    .masonry-grid {
+      column-count: 3;
+    }
+  }
+  @media (min-width: 1536px) {
+    .masonry-grid {
+      column-count: 4;
+    }
+  }
+  .masonry-item {
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Design System Utilities */
+  .surface-primary {
+    background-color: var(--surface-primary);
+  }
+  .surface-secondary {
+    background-color: var(--surface-secondary);
+  }
+  .surface-tertiary {
+    background-color: var(--surface-tertiary);
+  }
+  
+  .text-primary {
+    color: var(--text-primary);
+  }
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+  .text-tertiary {
+    color: var(--text-tertiary);
+  }
+  .text-accent {
+    color: var(--text-accent);
+  }
+  
+  .border-chateau-gold {
+    border-color: var(--color-chateau-gold);
+  }
+  .bg-chateau-gold {
+    background-color: var(--color-chateau-gold);
+  }
+  .text-chateau-gold {
+    color: var(--color-chateau-gold);
+  }
+  
+  .border-chateau-red {
+    border-color: var(--color-chateau-red);
+  }
+  .bg-chateau-red {
+    background-color: var(--color-chateau-red);
+  }
+  .text-chateau-red {
+    color: var(--color-chateau-red);
+  }
+  
+  .border-chateau-green {
+    border-color: var(--color-chateau-green);
+  }
+  .bg-chateau-green {
+    background-color: var(--color-chateau-green);
+  }
+  .text-chateau-green {
+    color: var(--color-chateau-green);
+  }
+  
+  /* Focus Ring */
+  .focus-ring-chateau {
+    outline: none;
+    box-shadow: 0 0 0 var(--focus-ring-offset) var(--focus-ring);
+  }
+  .focus-ring-chateau:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 var(--focus-ring-offset) var(--focus-ring);
+  }
+  
+  /* Card Shadow */
+  .card-shadow {
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+  }
+  .card-shadow-hover {
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+  
+  /* Responsive Utilities */
+  @media (max-width: 640px) {
+    .mobile-grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+  }
+  
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .tablet-grid-cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  
+  /* Mobile sidebar */
+  @media (max-width: 768px) {
+    .mobile-sidebar-hidden {
+      transform: translateX(-100%);
+    }
+    .mobile-sidebar-visible {
+      transform: translateX(0);
+    }
+  }
+  
+  /* Mobile table improvements */
+  @media (max-width: 640px) {
+    .mobile-table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-table-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Mobile CTA stacking */
+    .mobile-cta-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .mobile-cta-stack a {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    /* Mobile priority ordering */
+    .mobile-priority-first {
+      order: -1;
+    }
+    
+    .mobile-priority-second {
+      order: 0;
+    }
+    
+    .mobile-priority-third {
+      order: 1;
+    }
+  }
+  
+  /* Accessible Pattern for Color-Only States */
+  .pattern-dot {
+    background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+    background-size: 8px 8px;
+  }
+  .pattern-stripe {
+    background-image: repeating-linear-gradient(
+      45deg,
+      currentColor 0,
+      currentColor 1px,
+      transparent 0,
+      transparent 50%
+    );
+    background-size: 8px 8px;
+  }
 }

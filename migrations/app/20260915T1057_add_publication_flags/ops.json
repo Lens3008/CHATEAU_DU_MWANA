@@ -1,0 +1,118 @@
+[
+  {
+    "id": "column.public.formula.isPublished",
+    "label": "Add column \"isPublished\" to \"formula\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "isPublished",
+        "table": "formula"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"isPublished\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "formula",
+          "isPublished"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"isPublished\"",
+        "sql": "ALTER TABLE \"public\".\"formula\" ADD COLUMN \"isPublished\" bool DEFAULT false NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"isPublished\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "formula",
+          "isPublished"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.service.isPublished",
+    "label": "Add column \"isPublished\" to \"service\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "isPublished",
+        "table": "service"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"isPublished\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "service",
+          "isPublished"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"isPublished\"",
+        "sql": "ALTER TABLE \"public\".\"service\" ADD COLUMN \"isPublished\" bool DEFAULT false NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"isPublished\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "service",
+          "isPublished"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data_migration.backfill_catalogue_publication_flags",
+    "label": "Backfill catalogue publication flags",
+    "operationClass": "data",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Publish existing formulas by default",
+        "sql": "UPDATE \"public\".\"formula\" SET \"isPublished\" = true WHERE \"isPublished\" = false",
+        "params": []
+      },
+      {
+        "description": "Publish existing services by default",
+        "sql": "UPDATE \"public\".\"service\" SET \"isPublished\" = true WHERE \"isPublished\" = false",
+        "params": []
+      },
+      {
+        "description": "Keep validation formulas private",
+        "sql": "UPDATE \"public\".\"formula\" SET \"isPublished\" = false WHERE \"name\" IN ('TEST_FORMULA', 'TEST_B3_FORMULA')",
+        "params": []
+      },
+      {
+        "description": "Keep validation services private",
+        "sql": "UPDATE \"public\".\"service\" SET \"isPublished\" = false WHERE \"name\" IN ('TEST_SERVICE', 'TEST_B3_SERVICE')",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  }
+]

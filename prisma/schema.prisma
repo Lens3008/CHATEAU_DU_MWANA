@@ -1,0 +1,878 @@
+
+
+// ==========================================
+// 1. UTILISATEURS, CRM & RBAC
+// ==========================================
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  SECRETARY
+  LOGISTICIAN
+  CLIENT
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  name      String?
+  
+  role      UserRole @default(CLIENT) 
+  isActive  Boolean  @default(true)
+  
+  customerId String?   @unique
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime 
+
+  roleAssignments          UserRoleAssignment[]
+  auditLogs                AuditLog[]
+  statusHistories          ReservationStatusHistory[]
+  maintenanceTasks         EquipmentMaintenance[]
+  logisticsMissions        LogisticsMission[] @relation("MissionAssignedUser")
+  deliveries               Delivery[]         @relation("DeliveryManager")
+  logisticsHistories       LogisticsHistory[]
+  equipmentStatusHistories EquipmentStatusHistory[]
+  inventoryMovements       InventoryMovement[]
+  notifications            Notification[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  
+  
+  permissions RolePermission[]
+  users       UserRoleAssignment[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  
+  
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRoleAssignment {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Customer {
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  phone         String?
+  whatsapp      String?  
+  email         String?  @unique
+  notes         String?  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime 
+
+  locations      Location[]
+  reservations   Reservation[]
+  invoices       Invoice[]
+  loyaltyAccount LoyaltyAccount?
+  
+  user           User?
+
+  @@index([whatsapp])
+}
+
+model LoyaltyAccount {
+  id                String   @id @default(uuid())
+  customerId        String   @unique
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  loyaltyLevelId    String
+  loyaltyLevel      LoyaltyLevel @relation(fields: [loyaltyLevelId], references: [id], onDelete: Restrict)
+  currentPoints     Int      @default(0)
+  totalPointsEarned Int      @default(0)
+  joinedAt          DateTime @default(now())
+
+  transactions LoyaltyTransaction[]
+}
+
+model LoyaltyLevel {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  pointsThreshold     Int
+  benefitsDescription String?  
+  
+  accounts LoyaltyAccount[]
+}
+
+model LoyaltyReward {
+  id          String   @id @default(uuid())
+  name        String
+  pointsCost  Int
+  description String?  
+  
+  transactions LoyaltyTransaction[]
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+}
+
+model LoyaltyTransaction {
+  id          String                 @id @default(uuid())
+  accountId   String
+  account     LoyaltyAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  rewardId    String?
+  reward      LoyaltyReward?         @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  
+  points      Int
+  type        LoyaltyTransactionType
+  referenceId String?
+  date        DateTime               @default(now())
+
+  @@index([accountId])
+}
+
+// ==========================================
+// 2. LOCALISATION
+// ==========================================
+
+model Location {
+  id                 String    @id @default(uuid())
+  customerId         String?
+  customer           Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  isChateau          Boolean   @default(false)
+  name               String?   
+  country            String?
+  region             String?
+  city               String?
+  commune            String?
+  neighborhood       String?
+  detailedAddress    String?   
+  landmark           String?
+  latitude           Float?
+  longitude          Float?
+  precision          String?
+  accessInstructions String?   
+  contactPhone       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  
+
+  reservations  Reservation[] @relation("ReservationLocation")
+  deliveries    Delivery[]    @relation("DeliveryDestination")
+
+  @@index([customerId])
+}
+
+// ==========================================
+// 3. CATALOGUE COMMERCIAL (Prestations)
+// ==========================================
+
+model ServiceCategory {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?   
+  services    Service[]
+}
+
+model Service {
+  id           String          @id @default(uuid())
+  categoryId   String
+  category     ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name         String
+  description  String?         
+  basePrice    Decimal
+  duration     Int?
+  capacity     Int?
+  availability Boolean         @default(true)
+  isPublished  Boolean         @default(false)
+  conditions   String?         
+  images       Json?
+
+  formulas Formula[]
+}
+
+model Formula {
+  id           String   @id @default(uuid())
+  serviceId    String
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  name         String
+  price        Decimal
+  description  String?  
+  duration     Int?
+  capacity     Int?
+  availability Boolean  @default(true)
+  isPublished  Boolean  @default(false)
+  conditions   String?  
+
+  resources        ServiceResource[]
+  reservationItems ReservationItem[]
+  invoiceItems     InvoiceItem[]
+}
+
+// ==========================================
+// 4. RÉSERVATION & PAIEMENT
+// ==========================================
+
+enum LocationType {
+  VENUE
+  CUSTOMER_ADDRESS
+  OTHER_LOCATION
+}
+
+enum ReservationStatus {
+  DRAFT
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentGlobalStatus {
+  PENDING
+  PARTIAL
+  PAID
+  PARTIAL_REFUNDED
+  FULLY_REFUNDED
+}
+
+model Reservation {
+  id            String              @id @default(uuid())
+  reference     String              @unique
+  customerId    String
+  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  
+  locationId    String
+  location      Location            @relation("ReservationLocation", fields: [locationId], references: [id], onDelete: Restrict)
+  locationType  LocationType
+
+  startDate     DateTime
+  endDate       DateTime?
+  participants  Int?
+  status        ReservationStatus   @default(DRAFT)
+  paymentStatus PaymentGlobalStatus @default(PENDING)
+  totalAmount   Decimal
+  
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            
+
+  items               ReservationItem[]
+  statusHistories     ReservationStatusHistory[]
+  payment             Payment?
+  invoices            Invoice[]
+  inventoryAllocations InventoryAllocation[]
+  logisticsMissions   LogisticsMission[]
+  deliveries          Delivery[]
+
+  @@index([startDate, endDate])
+  @@index([customerId])
+  @@index([status])
+}
+
+model ReservationItem {
+  id            String      @id @default(uuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  formulaId     String
+  formula       Formula     @relation(fields: [formulaId], references: [id], onDelete: Restrict)
+  quantity      Int         @default(1)
+  unitPrice     Decimal
+  totalPrice    Decimal
+
+  @@index([reservationId])
+}
+
+model ReservationStatusHistory {
+  id            String            @id @default(uuid())
+  reservationId String
+  reservation   Reservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  oldStatus     ReservationStatus?
+  newStatus     ReservationStatus
+  changedById   String?
+  changedBy     User?             @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  reason        String?           
+  date          DateTime          @default(now())
+  
+  @@index([reservationId])
+}
+
+// --- FACTURATION ---
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  reservationId String
+  reservation   Reservation   @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  number        String        @unique
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime?
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal
+  taxAmount     Decimal
+  totalAmount   Decimal
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      
+
+  items InvoiceItem[]
+
+  @@index([reservationId])
+  @@index([customerId])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal
+  totalPrice  Decimal
+  
+  formulaId   String?
+  formula     Formula? @relation(fields: [formulaId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+}
+
+// --- PAIEMENT (Transactions) ---
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CHEQUE
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  
+  reservationId String   @unique
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  
+  totalExpected Decimal
+  totalPaid     Decimal @default("0")
+  status        PaymentGlobalStatus @default(PENDING)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime 
+
+  transactions PaymentTransaction[]
+}
+
+model PaymentTransaction {
+  id                   String                   @id @default(uuid())
+  paymentId            String
+  payment              Payment                  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount               Decimal
+  method               PaymentMethod
+  status               PaymentTransactionStatus @default(PENDING)
+  transactionReference String?                  @unique
+  date                 DateTime                 @default(now())
+
+  refunds   Refund[]
+  histories PaymentTransactionHistory[]
+
+  @@index([paymentId])
+}
+
+model Refund {
+  id                   String             @id @default(uuid())
+  paymentTransactionId String
+  transaction          PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Restrict)
+  amount               Decimal
+  reason               String?            
+  date                 DateTime           @default(now())
+
+  @@index([paymentTransactionId])
+}
+
+model PaymentTransactionHistory {
+  id            String                   @id @default(uuid())
+  transactionId String
+  transaction   PaymentTransaction       @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  oldStatus     PaymentTransactionStatus?
+  newStatus     PaymentTransactionStatus
+  date          DateTime                 @default(now())
+
+  @@index([transactionId])
+}
+
+// ==========================================
+// 5. INVENTAIRE, MATÉRIEL, MAINTENANCE & STOCKAGE
+// ==========================================
+
+model StorageLocation {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?     
+  
+  inventories         Inventory[]
+  movementsFrom       InventoryMovement[] @relation("StorageMovementFrom")
+  movementsTo         InventoryMovement[] @relation("StorageMovementTo")
+}
+
+model EquipmentCategory {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?     
+  
+  equipments  Equipment[]
+}
+
+model Equipment {
+  id                  String   @id @default(uuid())
+  categoryId          String
+  category            EquipmentCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name                String
+  description         String?  
+  totalGlobalQuantity Int      @default(0)
+  minStockThreshold   Int      @default(0)
+
+  serviceResources ServiceResource[]
+  inventory        Inventory[]
+  deliveryItems    DeliveryItem[]
+}
+
+model ServiceResource {
+  id               String    @id @default(uuid())
+  formulaId        String
+  formula          Formula   @relation(fields: [formulaId], references: [id], onDelete: Cascade)
+  equipmentId      String
+  equipment        Equipment @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  requiredQuantity Int       @default(1)
+  
+  @@unique([formulaId, equipmentId])
+}
+
+enum InventoryStatus {
+  AVAILABLE
+  IN_USE
+  IN_MAINTENANCE
+  LOST
+}
+
+model Inventory {
+  id                String          @id @default(uuid())
+  equipmentId       String
+  equipment         Equipment       @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  storageLocationId String?
+  storageLocation   StorageLocation? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
+  name              String?
+  quantity          Int             @default(1)
+  status            InventoryStatus @default(AVAILABLE)
+
+  allocations      InventoryAllocation[]
+  maintenanceTasks EquipmentMaintenance[]
+  deliveryItems    DeliveryItem[]
+  statusHistories  EquipmentStatusHistory[]
+  movements        InventoryMovement[]
+
+  @@index([equipmentId])
+  @@index([storageLocationId])
+}
+
+enum MovementType {
+  IN
+  OUT
+  TRANSFER
+  ADJUSTMENT
+  MAINTENANCE
+  LOST
+  RETURN
+}
+
+model InventoryMovement {
+  id          String       @id @default(uuid())
+  inventoryId String
+  inventory   Inventory    @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  type        MovementType
+  quantity    Int
+  reason      String?      
+  date        DateTime     @default(now())
+  
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  fromStorageLocationId String?
+  fromStorage           StorageLocation? @relation("StorageMovementFrom", fields: [fromStorageLocationId], references: [id], onDelete: SetNull)
+  toStorageLocationId   String?
+  toStorage             StorageLocation? @relation("StorageMovementTo", fields: [toStorageLocationId], references: [id], onDelete: SetNull)
+
+  referenceType String?
+  referenceId   String?
+
+  @@index([inventoryId])
+  @@index([date])
+}
+
+enum AllocationStatus {
+  RESERVED
+  DEPLOYED
+  RETURNED
+}
+
+model InventoryAllocation {
+  id                String           @id @default(uuid())
+  reservationId     String
+  reservation       Reservation      @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  inventoryId       String
+  inventory         Inventory        @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  quantityAllocated Int
+  startDate         DateTime
+  endDate           DateTime
+  status            AllocationStatus @default(RESERVED)
+
+  @@index([inventoryId, startDate, endDate])
+  @@index([reservationId])
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+model EquipmentMaintenance {
+  id               String            @id @default(uuid())
+  inventoryId      String
+  inventory        Inventory         @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  issueDescription String            
+  responsibleId    String?
+  responsible      User?             @relation(fields: [responsibleId], references: [id], onDelete: SetNull)
+  cost             Decimal?          
+  status           MaintenanceStatus @default(PENDING)
+  startDate        DateTime          @default(now())
+  returnDate       DateTime?
+
+  @@index([inventoryId, status])
+}
+
+model EquipmentStatusHistory {
+  id          String          @id @default(uuid())
+  inventoryId String
+  inventory   Inventory       @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  oldStatus   InventoryStatus?
+  newStatus   InventoryStatus
+  
+  changedById String?
+  changedBy   User?           @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  
+  reason      String?         
+  date        DateTime        @default(now())
+  
+  @@index([inventoryId])
+}
+
+// ==========================================
+// 6. LOGISTIQUE & LIVRAISONS
+// ==========================================
+
+enum MissionStatus {
+  A_PLANIFIER
+  PLANIFIEE
+  EN_PREPARATION
+  EN_COURS
+  TERMINEE
+  ANNULEE
+  INCIDENT
+}
+
+model LogisticsMission {
+  id             String        @id @default(uuid())
+  reservationId  String
+  reservation    Reservation   @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  assignedUserId String?
+  assignedUser   User?         @relation("MissionAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  scheduledDate  DateTime?
+  status         MissionStatus @default(A_PLANIFIER)
+  notes          String?       
+  incidents      String?       
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      
+
+  deliveries Delivery[]
+  histories  LogisticsHistory[]
+
+  @@index([reservationId])
+  @@index([status])
+}
+
+model LogisticsHistory {
+  id          String           @id @default(uuid())
+  missionId   String
+  mission     LogisticsMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  oldStatus   MissionStatus?
+  newStatus   MissionStatus
+  
+  changedById String?
+  changedBy   User?            @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  
+  notes       String?          
+  date        DateTime         @default(now())
+  
+  @@index([missionId])
+}
+
+enum DeliveryType {
+  OUTBOUND
+  INBOUND
+}
+
+enum DeliveryStatus {
+  PLANNED
+  EN_ROUTE
+  DELIVERED
+  RETURNED
+  FAILED
+}
+
+model Delivery {
+  id               String           @id @default(uuid())
+  missionId        String
+  mission          LogisticsMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  reservationId    String
+  reservation      Reservation      @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  destinationId    String
+  destination      Location         @relation("DeliveryDestination", fields: [destinationId], references: [id], onDelete: Restrict)
+  
+  type             DeliveryType
+  status           DeliveryStatus   @default(PLANNED)
+  
+  plannedTime      DateTime?
+  actualTime       DateTime?
+  
+  managerId        String?
+  manager          User?            @relation("DeliveryManager", fields: [managerId], references: [id], onDelete: SetNull)
+  
+  siteContactName  String?
+  siteContactPhone String?
+  
+  instructions     String?          
+  incidents        String?          
+  
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         
+
+  items DeliveryItem[]
+
+  @@index([missionId])
+  @@index([reservationId])
+}
+
+model DeliveryItem {
+  id          String     @id @default(uuid())
+  deliveryId  String
+  delivery    Delivery   @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  
+  inventoryId String?
+  inventory   Inventory? @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  equipmentId String?
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  
+  quantity    Int        @default(1)
+  condition   String?
+
+  @@index([deliveryId])
+}
+
+// ==========================================
+// 7. CMS, FRONT-OFFICE & CONTENU
+// ==========================================
+
+model ContentPage {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  content     String   
+  seo         Json?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime 
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+model Media {
+  id          String    @id @default(uuid())
+  url         String
+  storagePath String?
+  mimeType    String?
+  fileName    String?
+  sizeBytes   Int?
+  type        MediaType
+  altText     String?
+  createdAt   DateTime  @default(now())
+  
+  galleryItems GalleryItem[]
+}
+
+model Gallery {
+  id          String        @id @default(uuid())
+  name        String
+  description String?       
+  createdAt   DateTime      @default(now())
+  
+  items       GalleryItem[]
+}
+
+model GalleryItem {
+  id        String   @id @default(uuid())
+  galleryId String
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  order     Int      @default(0)
+  
+  @@unique([galleryId, mediaId])
+  @@index([galleryId])
+}
+
+model SiteSettings {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String   
+  description String?  
+  updatedAt   DateTime 
+}
+
+enum DocumentTemplateType {
+  INVOICE
+  CONTRACT
+  QUOTE
+}
+
+model DocumentTemplate {
+  id          String               @id @default(uuid())
+  name        String
+  type        DocumentTemplateType
+  content     String               
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             
+}
+
+// ==========================================
+// 8. COMMUNICATION & NOTIFICATIONS
+// ==========================================
+
+enum NotificationType {
+  SYSTEM
+  REMINDER
+  PROMO
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String           
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+}
+
+enum ContactMessageStatus {
+  NEW
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+model ContactMessage {
+  id        String               @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  message   String               
+  status    ContactMessageStatus @default(NEW)
+  createdAt DateTime             @default(now())
+}
+
+// ==========================================
+// 9. IMPORT DATA (Migration & Synchro)
+// ==========================================
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ImportJob {
+  id            String        @id @default(uuid())
+  entityType    String        // Ex: "CUSTOMER", "EQUIPMENT"
+  status        ImportStatus  @default(PENDING)
+  totalRows     Int           @default(0)
+  processedRows Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      
+
+  errors        ImportError[]
+}
+
+model ImportError {
+  id          String    @id @default(uuid())
+  importJobId String
+  importJob   ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  rowNumber   Int?
+  rawData     String?   
+  errorDetail String    
+  createdAt   DateTime  @default(now())
+
+  @@index([importJobId])
+}
+
+// ==========================================
+// 10. TRAÇABILITÉ (Audit)
+// ==========================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   
+  entityType String   
+  entityId   String
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  context    String?  
+  date       DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([date])
+}
